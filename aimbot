@@ -5,7 +5,7 @@ local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Konfigurasi Utama Original (Ditambahkan ESP TeamCheck)
+-- Configure Utama Original (Ditambahkan ESP TeamCheck)
 local Settings = {
     ESP = {
         Enabled = false,
