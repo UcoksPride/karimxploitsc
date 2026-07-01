@@ -5,12 +5,14 @@ local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Konfigurasi Utama Original (Ditambahkan TeamCheck)
+-- Konfigurasi Utama Original (Ditambahkan ESP TeamCheck)
 local Settings = {
     ESP = {
         Enabled = false,
+        TeamCheck = true, -- Fitur Baru: true = Sembunyikan ESP teman, false = Tampilkan ESP semua orang
         BoxColor = Color3.new(1, 0, 0.3),
         DistanceColor = Color3.new(1, 1, 1),
+        HealthColor = Color3.new(0, 1, 0),
         SnaplineEnabled = false,
         SnaplinePosition = "Center",
         RainbowEnabled = false
@@ -22,7 +24,8 @@ local Settings = {
         MaxDistance = 200,
         ShowFOV = true,
         TargetPart = "Head",
-        Smoothness = 5
+        Smoothness = 5,
+        NoRecoil = false
     }
 }
 
@@ -43,6 +46,7 @@ local function CreateESP(player)
         Box = Drawing.new("Square"),
         HealthBar = Drawing.new("Square"),
         Distance = Drawing.new("Text"),
+        HealthText = Drawing.new("Text"),
         Snapline = Drawing.new("Line")
     }
     
@@ -51,14 +55,20 @@ local function CreateESP(player)
         if obj.Type == "Square" then
             obj.Thickness = 2
             obj.Filled = false
+        elseif obj.Type == "Text" then
+            obj.Center = true
+            obj.Size = 14
         end
     end
     
     objects.Box.Color = Settings.ESP.BoxColor
     objects.Snapline.Color = Settings.ESP.BoxColor
-    objects.Distance.Center = true
+    
     objects.Distance.Size = 16
     objects.Distance.Color = Settings.ESP.DistanceColor
+    
+    objects.HealthText.Size = 14
+    objects.HealthText.Color = Settings.ESP.HealthColor
     
     ESPObjects[player] = objects
 end
@@ -73,7 +83,14 @@ local function RemoveESP(player)
 end
 
 local function UpdateESP(player, objects)
+    -- Pengecekan kondisi dasar ESP aktif dan karakter valid
     if not Settings.ESP.Enabled or not player.Character then
+        for _, obj in pairs(objects) do obj.Visible = false end
+        return
+    end
+    
+    -- [BARU] Logika ESP Team Check
+    if Settings.ESP.TeamCheck and player.Team == LocalPlayer.Team then
         for _, obj in pairs(objects) do obj.Visible = false end
         return
     end
@@ -96,20 +113,30 @@ local function UpdateESP(player, objects)
     local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
     local scale = 1000 / distance
     
+    -- Box ESP
     objects.Box.Size = Vector2.new(scale, scale * 1.5)
     objects.Box.Position = Vector2.new(pos.X - (scale / 2), pos.Y - (scale * 0.75))
     objects.Box.Visible = true
     
+    -- Health Bar ESP
     local healthPercent = humanoid.Health / humanoid.MaxHealth
     objects.HealthBar.Size = Vector2.new(4, scale * 1.5 * healthPercent)
     objects.HealthBar.Position = Vector2.new(pos.X - (scale / 2) - 8, (pos.Y - (scale * 0.75)) + (scale * 1.5 * (1 - healthPercent)))
     objects.HealthBar.Color = healthPercent > 0.5 and Color3.new(0,1,0) or Color3.new(1,0,0)
     objects.HealthBar.Visible = true
     
+    -- Distance Text
     objects.Distance.Text = math.floor(distance) .. "m"
     objects.Distance.Position = Vector2.new(pos.X, pos.Y + (scale * 0.75) + 5)
     objects.Distance.Visible = true
     
+    -- Health Text
+    objects.HealthText.Text = "HP: " .. math.floor(humanoid.Health)
+    objects.HealthText.Position = Vector2.new(pos.X, pos.Y + (scale * 0.75) + 20)
+    objects.HealthText.Color = healthPercent > 0.5 and Color3.new(0,1,0) or (healthPercent > 0.25 and Color3.new(1,1,0) or Color3.new(1,0,0))
+    objects.HealthText.Visible = true
+    
+    -- Snapline ESP
     if Settings.ESP.SnaplineEnabled then
         objects.Snapline.From = Vector2.new(pos.X, pos.Y)
         local targetY = Settings.ESP.SnaplinePosition == "Bottom" and Camera.ViewportSize.Y or (Settings.ESP.SnaplinePosition == "Top" and 0 or Camera.ViewportSize.Y / 2)
@@ -163,7 +190,7 @@ pcall(function() ScreenGui.Parent = CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 370, 0, 360)
+MainFrame.Size = UDim2.new(0, 370, 0, 380)
 MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
 MainFrame.Active = true
@@ -176,7 +203,7 @@ TitleBar.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
 local TitleLabel = Instance.new("TextLabel", TitleBar)
 TitleLabel.Size = UDim2.new(1, -50, 1, 0)
 TitleLabel.Position = UDim2.new(0, 10, 0, 0)
-TitleLabel.Text = "KarimXploit v1.0 (original)" -- Nama sudah diubah di sini
+TitleLabel.Text = "KarimXploit v1.0 (original)"
 TitleLabel.TextColor3 = Color3.new(1, 1, 1)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 14
@@ -202,7 +229,7 @@ AimbotPage.Size = UDim2.new(1, 0, 1, 0)
 AimbotPage.BackgroundTransparency = 1
 AimbotPage.Visible = false
 
--- Tombol Navigasi Tab Original
+-- Navigation Buttons
 local ESPTabBtn = Instance.new("TextButton", TabContainer)
 ESPTabBtn.Size = UDim2.new(1, 0, 0, 40)
 ESPTabBtn.Text = "ESP"
@@ -230,7 +257,7 @@ AimTabBtn.MouseButton1Click:Connect(function()
     AimTabBtn.BackgroundColor3 = Color3.new(0.12, 0.12, 0.12)
 end)
 
--- --- ISI TAB ESP ---
+-- --- TAB ESP ---
 local ToggleESP = Instance.new("TextButton", ESPPage)
 ToggleESP.Size = UDim2.new(0, 240, 0, 35)
 ToggleESP.Position = UDim2.new(0, 15, 0, 15)
@@ -244,9 +271,23 @@ ToggleESP.MouseButton1Click:Connect(function()
     ToggleESP.BackgroundColor3 = Settings.ESP.Enabled and Color3.new(0.2, 0.6, 0.2) or Color3.new(0.6, 0.2, 0.2)
 end)
 
+-- [BARU] UI Button untuk ESP Team Check
+local ToggleESPTeam = Instance.new("TextButton", ESPPage)
+ToggleESPTeam.Size = UDim2.new(0, 240, 0, 35)
+ToggleESPTeam.Position = UDim2.new(0, 15, 0, 60)
+ToggleESPTeam.Text = "ESP Team Check: ON"
+ToggleESPTeam.BackgroundColor3 = Color3.new(0.2, 0.6, 0.2)
+ToggleESPTeam.TextColor3 = Color3.new(1,1,1)
+
+ToggleESPTeam.MouseButton1Click:Connect(function()
+    Settings.ESP.TeamCheck = not Settings.ESP.TeamCheck
+    ToggleESPTeam.Text = "ESP Team Check: " .. (Settings.ESP.TeamCheck and "ON" or "OFF")
+    ToggleESPTeam.BackgroundColor3 = Settings.ESP.TeamCheck and Color3.new(0.2, 0.6, 0.2) or Color3.new(0.6, 0.2, 0.2)
+end)
+
 local ToggleSnap = Instance.new("TextButton", ESPPage)
 ToggleSnap.Size = UDim2.new(0, 240, 0, 35)
-ToggleSnap.Position = UDim2.new(0, 15, 0, 60)
+ToggleSnap.Position = UDim2.new(0, 15, 0, 105)
 ToggleSnap.Text = "Toggle Snaplines: OFF"
 ToggleSnap.BackgroundColor3 = Color3.new(0.6, 0.2, 0.2)
 ToggleSnap.TextColor3 = Color3.new(1,1,1)
@@ -257,7 +298,7 @@ ToggleSnap.MouseButton1Click:Connect(function()
     ToggleSnap.BackgroundColor3 = Settings.ESP.SnaplineEnabled and Color3.new(0.2, 0.6, 0.2) or Color3.new(0.6, 0.2, 0.2)
 end)
 
--- --- ISI TAB AIMBOT ---
+-- --- TAB AIMBOT ---
 local ToggleAim = Instance.new("TextButton", AimbotPage)
 ToggleAim.Size = UDim2.new(0, 240, 0, 35)
 ToggleAim.Position = UDim2.new(0, 15, 0, 15)
@@ -273,7 +314,7 @@ end)
 
 local ToggleShowFOV = Instance.new("TextButton", AimbotPage)
 ToggleShowFOV.Size = UDim2.new(0, 240, 0, 35)
-ToggleShowFOV.Position = UDim2.new(0, 15, 0, 60)
+ToggleShowFOV.Position = UDim2.new(0, 15, 0, 55)
 ToggleShowFOV.Text = "Show FOV Circle: ON"
 ToggleShowFOV.BackgroundColor3 = Color3.new(0.2, 0.6, 0.2)
 ToggleShowFOV.TextColor3 = Color3.new(1,1,1)
@@ -286,7 +327,7 @@ end)
 
 local ToggleTeam = Instance.new("TextButton", AimbotPage)
 ToggleTeam.Size = UDim2.new(0, 240, 0, 35)
-ToggleTeam.Position = UDim2.new(0, 15, 0, 105)
+ToggleTeam.Position = UDim2.new(0, 15, 0, 95)
 ToggleTeam.Text = "Aimbot Team Check: ON"
 ToggleTeam.BackgroundColor3 = Color3.new(0.2, 0.6, 0.2)
 ToggleTeam.TextColor3 = Color3.new(1,1,1)
@@ -297,17 +338,30 @@ ToggleTeam.MouseButton1Click:Connect(function()
     ToggleTeam.BackgroundColor3 = Settings.Aimbot.TeamCheck and Color3.new(0.2, 0.6, 0.2) or Color3.new(0.6, 0.2, 0.2)
 end)
 
+local ToggleRecoil = Instance.new("TextButton", AimbotPage)
+ToggleRecoil.Size = UDim2.new(0, 240, 0, 35)
+ToggleRecoil.Position = UDim2.new(0, 15, 0, 135)
+ToggleRecoil.Text = "No Recoil: OFF"
+ToggleRecoil.BackgroundColor3 = Color3.new(0.6, 0.2, 0.2)
+ToggleRecoil.TextColor3 = Color3.new(1,1,1)
+
+ToggleRecoil.MouseButton1Click:Connect(function()
+    Settings.Aimbot.NoRecoil = not Settings.Aimbot.NoRecoil
+    ToggleRecoil.Text = "No Recoil: " .. (Settings.Aimbot.NoRecoil and "ON" or "OFF")
+    ToggleRecoil.BackgroundColor3 = Settings.Aimbot.NoRecoil and Color3.new(0.2, 0.6, 0.2) or Color3.new(0.6, 0.2, 0.2)
+end)
+
 -- Input FOV Radius
 local FOVLabel = Instance.new("TextLabel", AimbotPage)
 local FOVBox = Instance.new("TextBox", AimbotPage)
 FOVLabel.Size = UDim2.new(0, 100, 0, 30)
-FOVLabel.Position = UDim2.new(0, 15, 0, 150)
+FOVLabel.Position = UDim2.new(0, 15, 0, 180)
 FOVLabel.Text = "FOV Radius:"
 FOVLabel.TextColor3 = Color3.new(1,1,1)
 FOVLabel.BackgroundTransparency = 1
 
 FOVBox.Size = UDim2.new(0, 130, 0, 30)
-FOVBox.Position = UDim2.new(0, 125, 0, 150)
+FOVBox.Position = UDim2.new(0, 125, 0, 180)
 FOVBox.Text = tostring(Settings.Aimbot.FOV)
 FOVBox.BackgroundColor3 = Color3.new(0.15,0.15,0.15)
 FOVBox.TextColor3 = Color3.new(1,1,1)
@@ -321,13 +375,13 @@ end)
 local DistLabel = Instance.new("TextLabel", AimbotPage)
 local DistBox = Instance.new("TextBox", AimbotPage)
 DistLabel.Size = UDim2.new(0, 100, 0, 30)
-DistLabel.Position = UDim2.new(0, 15, 0, 190)
+DistLabel.Position = UDim2.new(0, 15, 0, 215)
 DistLabel.Text = "Max Distance:"
 DistLabel.TextColor3 = Color3.new(1,1,1)
 DistLabel.BackgroundTransparency = 1
 
 DistBox.Size = UDim2.new(0, 130, 0, 30)
-DistBox.Position = UDim2.new(0, 125, 0, 190)
+DistBox.Position = UDim2.new(0, 125, 0, 215)
 DistBox.Text = tostring(Settings.Aimbot.MaxDistance)
 DistBox.BackgroundColor3 = Color3.new(0.15,0.15,0.15)
 DistBox.TextColor3 = Color3.new(1,1,1)
@@ -341,13 +395,13 @@ end)
 local SmoothLabel = Instance.new("TextLabel", AimbotPage)
 local SmoothBox = Instance.new("TextBox", AimbotPage)
 SmoothLabel.Size = UDim2.new(0, 100, 0, 30)
-SmoothLabel.Position = UDim2.new(0, 15, 0, 230)
+SmoothLabel.Position = UDim2.new(0, 15, 0, 250)
 SmoothLabel.Text = "Smoothness:"
 SmoothLabel.TextColor3 = Color3.new(1,1,1)
 SmoothLabel.BackgroundTransparency = 1
 
 SmoothBox.Size = UDim2.new(0, 130, 0, 30)
-SmoothBox.Position = UDim2.new(0, 125, 0, 230)
+SmoothBox.Position = UDim2.new(0, 125, 0, 250)
 SmoothBox.Text = tostring(Settings.Aimbot.Smoothness)
 SmoothBox.BackgroundColor3 = Color3.new(0.15,0.15,0.15)
 SmoothBox.TextColor3 = Color3.new(1,1,1)
@@ -358,11 +412,23 @@ SmoothBox.FocusLost:Connect(function()
     if num and num >= 1 then Settings.Aimbot.Smoothness = num else SmoothBox.Text = tostring(Settings.Aimbot.Smoothness) end
 end)
 
--- Toggle Buka/Tutup Menu Lewat Tombol Insert
+-- Toggle Menu Key (Insert)
 UserInputService.InputBegan:Connect(function(input, gpe)
     if not gpe and input.KeyCode == Enum.KeyCode.Insert then
         MenuOpen = not MenuOpen
         MainFrame.Visible = MenuOpen
+    end
+end)
+
+-- Hook untuk No Recoil
+Camera:GetPropertyChangedSignal("CFrame"):Connect(function()
+    if Settings.Aimbot.NoRecoil and Settings.Aimbot.Enabled and GetClosestPlayer() then
+        local targetPlayer = GetClosestPlayer()
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild(Settings.Aimbot.TargetPart) then
+            local targetPart = targetPlayer.Character[Settings.Aimbot.TargetPart]
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 1 / Settings.Aimbot.Smoothness)
+        end
     end
 end)
 
